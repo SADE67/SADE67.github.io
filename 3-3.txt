@@ -1,0 +1,37 @@
+
+-----------------------
+принт-сервер cups
+-----------------------
+
+---HQ-SRV---
+apt-get update && apt-get install cups cups-pdf
+vim /etc/cups/cupsd.conf (пишем после голубой строки)
+
+--------------------------------
+listen hq-srv.au-team.irpo:631
+--------------------------------
+
+cupsctl --share-printers --remote-any
+systemctl enable --now cups
+systemctl status cups
+
+---HQ-CLI---
+lpadmin -p HQ-PDF -E -v ipp://hq-srv.au-team.irpo/printers/Cups-PDF -m everywhere
+lpadmin -d HQ-PDF
+проверка: applications - all - printer settings - HQ_PDF
+Заходим в настройки принтера, нажимая на его
+иконку 2 раза и запускаем на тестовую печать,
+description: Cups-PDF
+location:
+device URI: ipp://hq-srv.au-team.irpo/p
+make and model: CUPS-PDF Printer (w/ optio
+printer state: idle
+
+---HQ-SRV---
+ls –l /var/spool/cups
+cp /var/spool/cups/d00001-001 /raid/nfs/Print.pdf
+chmod 777 /raid/nfs/Print.pdf
+ls -l /raid/nfs/Print.pdf
+
+---HQ-CLI---
+Открываем проводник (administartors home) и переходим в places > mnt > nfs > открываем файл Print.pdf

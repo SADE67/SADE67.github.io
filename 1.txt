@@ -1,0 +1,88 @@
+
+=========================
+	samba
+=========================
+
+--- BR-SRV ---
+apt-get update && apt-get install task-samba-dc –y
+rm –rf /etc/samba/smb.conf
+vim /etc/hosts (вниз)
+
+--------------------------------------
+192.168.3.10	br-srv.au-team.irpo
+--------------------------------------
+
+vim /etc/resolv.conf
+
+--------------------------
+nameserver 192.168.1.10
+--------------------------
+
+--- HQ-SRV ---
+vim /etc/dnsmasq (пишем после строки address=/br-srv.au-team.irpo/192.168.3.10)
+
+-----------------------------------
+server=/au-team.irpo/192.168.3.10
+-----------------------------------
+
+systemctl restart dnsmasq
+
+--- BR-SRV ---
+samba-tool domain provision
+mv –f /var/lib/samba/private/krb5.conf /etc/krb5.conf
+systemctl enable --now samba
+apt-repo add http://altrepo.ru/local-p10 noarch local-p10
+apt-get update && apt-get install sudo-samba-schema –y
+sudo-schema-apply
+Administrator P@ssw0rd
+create-sudo-rule
+OU=sudoers,dc=AU-TEAM,dc=IRPO
+prava_hq
+ALL
+/bin/cat
+%hq
+samba-tool domain info 127.0.0.1
+samba-tool user add hquser1 P@ssw0rd
+samba-tool user add hquser2 P@ssw0rd
+samba-tool user add hquser3 P@ssw0rd
+samba-tool user add hquser4 P@ssw0rd
+samba-tool user add hquser5 P@ssw0rd
+samba-tool group add hq
+samba-tool group addmembers hq hquser1,hquser2,hquser3,hquser4,hquser5
+
+--- HQ-CLI ---
+ЦУС-ПОЛЬЗОВАТЕЛИ-АУТЕНТИФИКАЦИЯ
+domain=AU-TEAM.IRPO
+workgroup=AU-TEAM
+Administrator
+P@ssw0rd
+apt-get update && apt-get install admc –y
+kinit administrator
+admc
+preferences-advanced features-au-team.irpo-sudoers-attributes
+sudoOption-!authenticate
+sudoCommand-/bin/cat, /bin/grep, /usr/bin/id
+apt-get install sudo libsss_sudo
+control sudo public
+vim /etc/sssd/sssd.conf (ищем названия строк и меняем)
+
+----------------------------
+services = nss, pam, sudo
+sudo_provider = ad
+----------------------------
+
+vim /etc/nsswitch.conf (ищем названия строк и меняем)
+
+------------------------
+sudoers: files sss
+-------------------------
+
+reboot
+rm –rf /var/lib/sss/db/*
+sss_cache –E
+systemctl restart sssd
+Ctrl+Alt+F2 (login root)
+sudo –l –U hquser1
+reboot
+вход hquser1 P@ssw0rd
+sudo cat /etc/passwd | sudo grep root && sudo id root

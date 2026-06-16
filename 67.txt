@@ -1,0 +1,96 @@
+
+========================
+	docker
+========================
+
+--- ALT-PVE ---
+local (ALTpve) - ISO images - upload - нужно монтировать образ, который
+выдан по заданию, затем нажать Upload
+После успешного скачивания образа Additional.iso в ALT-PVE, нужно выключить машину BR-SRV,
+затем кликнуть по BR-SRV > Hardware > Add > CD/DVD Drive. Потом в появившемся окне в
+категории Storage выбрать local, а в категории ISO Image образ, который был выдан по заданию.
+
+--- BR-SRV ---
+apt-get update && apt-get install docker-compose-v2 docker-engine –y
+systemctl enable --now docker
+mount /dev/sr0 /mnt
+ls /mnt
+docker load < /mnt/docker/site_latest.tar
+docker load < /mnt/docker/mariadb_latest.tar
+docker images (repository, site, maria db)
+vim /root/site.yml
+
+---------------------------------------------
+services:
+  db:
+    image: mariadb:10.11
+    container_name: db
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MARIADB_DATABASE: "testdb"
+      MARIADB_USER: "testc"
+      MARIADB_PASSWORD: "P@ssw0rd"
+      MARIADB_ROOT_PASSWORD: "toor"
+
+  testapp:
+    image: site
+    container_name: testapp
+    restart: always
+    ports:
+      - "8080:8000"
+    environment:
+      DB_TYPE: "maria"
+      DB_HOST: db
+      DB_NAME: "testdb"
+      DB_USER: "testc"
+      DB_PASS: "P@ssw0rd"
+      DB_PORT: "3306"
+    depends_on:
+      - db
+---------------------------------------------
+
+docker compose –f site.yml up –d
+
+--- HQ-CLI ---
+в яндекс строку http://192.168.3.10:8080
+
+==========================
+	веб приложение
+==========================
+
+--- HQ-SRV ---
+Установка и включение веб-сервера Apache
+Нужно выключить машину HQ-SRV, затем кликнуть по HQ-
+SRV > Hardware > Add > CD/DVD Drive. Потом в
+появившемся окне в категории Storage выбрать local, а в
+категории ISO Image образ, который был выдан по заданию.
+apt-get update && apt-get install lamp-server –y
+mount -o loop /dev/sr0 /mnt
+cp /mnt/web/index.php /var/www/html
+cp /mnt/web/logo.png /var/www/html
+vim /var/www/html/index.php
+
+-------------------------------------
+<?php
+$servername = "localhost";
+$username = "webc";
+$password = "P@ssw0rd";
+$dbname = "webdb";
+--------------------------------------
+
+systemctl enable --now mariadb
+mariadb -u root
+CREATE DATABASE webdb;
+CREATE USER ‘webc’@’localhost’ IDENTIFIED BY ‘P@ssw0rd’;
+GRANT ALL PRIVILEGES ON webdb.* TO ‘webc’@’localhost’ WITH GRANT OPTION;
+EXIT;
+mariadb -u webc -pP@ssw0rd -D webdb < /mnt/web/dump.sql
+systemctl enable --now httpd2
+mariadb
+USE webdb;
+SHOW TABLES;
+
+--- HQ-CLI ---
+в яндекс строку http://192.168.1.10

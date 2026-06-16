@@ -1,0 +1,63 @@
+
+----------------------
+импорт пользователей
+----------------------
+
+---BR-SRV---
+mount /dev/sr0 /mnt/
+wc -l /mnt/Users.csv
+[root@br-srv ~]# wc -l /mnt/Users.csv
+301 /mnt/Users.csv
+head -n1 /mnt/Users.csv
+head -n1 /mnt/Users.csv | tr -cd ';' | wc -c | awk '{print $1+1}'
+[root@br-srv ~]# head -n1 /mnt/Users.csv
+First Name;Last Name;Role;Phone;OU;Street;ZIP/Postal Code;City;Country/Region;Password
+[root@br-srv ~]# head -n1 /mnt/Users.csv | tr -cd ';' | wc -c | awk '{print $1+1}'
+10
+awk -F ';' 'NR>1 {print $5}' /mnt/Users.csv | sort | uniq
+[root@br-srv ~]# awk -F ';' 'NR>1 {print $5}' /mnt/Users.csv | sort | uniq
+Cloud storage
+IT
+Manager
+Overal
+Supporter
+vim import_user.sh
+
+-------------------------------------------------------------------------
+#!/bin/bash
+
+csv_file="$1"
+
+# Create OU
+awk -F ';' 'NR>1 {print $5}' "$csv_file" | sort | uniq | while read ou;
+do
+        samba-tool ou add OU="$ou",DC=au-team,DC=irpo;
+done
+
+# Create Users
+while IFS=";" read -r firstName lastName role phone ou street zip city country password;
+do
+        if [ "$firstName" == "First Name" ];
+        then
+                continue
+        fi
+
+        username="${firstName,,}.${lastName,,}"
+
+        samba-tool user add "$username" P@ssw0rd1 \
+                --given-name="$firstName" \
+                --surname="$lastName" \
+                --telephone-number="$phone" \
+                --job-title="$role" \
+                --userou="OU=$ou"
+        samba-tool user setexpiry "$username" --noexpiry
+done < "$csv_file"
+--------------------------------------------------------------------------
+
+chmod +x import_user.sh
+./import_user.sh /mnt/Users.csv
+samba-tool ou list
+
+---HQ-CLI---
+Проверить возможность входа из-под импортированного пользователя.
+id

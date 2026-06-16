@@ -1,0 +1,156 @@
+
+==================================
+		chrony
+==================================
+
+--- ISP ---
+apt-get install –y chrony
+vim /etc/chrony.conf (Указываем сервером самого себя)
+
+-----------------------------------
+server 127.0.0.1 iburst prefer
+-----------------------------------
+
+Выдаёт собственный сетевой интерфейс за источник времени и синхронизирует с ним клиентов
+hwtimestamp *
+Задаём иерархию уровня
+local stratum 5
+разрешает NTP-запросы от любых IP-адресов
+allow 0/0
+systemctl enable --now chronyd
+systemctl restart chronyd
+chronyc clients
+chronyc tracking | grep Stratum
+
+--- HQ-RTR ---
+en
+conf t
+ntp server 172.16.1.1
+ntp timezone utc+5
+ex
+show ntp status
+write memory
+
+--- HQ-SRV ---
+apt-get install -y chrony
+vim /etc/chrony.conf
+
+---------------------------------
+server 172.16.1.1 iburst prefer
+---------------------------------
+
+systemctl enable --now chronyd
+systemctl restart chronyd
+timedatectl
+
+--- HQ-CLI ---
+apt-get install -y chrony
+vim /etc/chrony.conf
+
+---------------------------------
+server 172.16.1.1 iburst prefer
+---------------------------------
+
+systemctl enable --now chronyd
+systemctl restart chronyd
+timedatectl
+
+--- BR-RTR ---
+en
+conf t
+ntp server 172.16.2.1
+ntp timezone utc+5
+ex
+show ntp status
+write memory
+
+--- BR-SRV ---
+apt-get install -y chrony
+vim /etc/chrony.conf
+
+---------------------------------
+server 172.16.2.1 iburst prefer
+---------------------------------
+
+systemctl enable --now chronyd
+systemctl restart chronyd
+timedatectl
+
+--- ISP ---
+chronyc clients
+
+=============================
+	ansible
+=============================
+
+--- BR-SRV ---
+apt-get update
+apt-get install ansible -y
+vim /etc/ansible/hosts (отедачить)
+
+-------------------------------------------
+VMs:
+ hosts:
+  HQ-SRV:
+    ansible_host: 192.168.1.10
+    ansible_user: sshuser
+    ansible_port: 2026
+  HQ-CLI:
+    ansible_host: 192.168.2.10
+    ansible_user: sshuser
+    ansible_port: 2026
+  HQ-RTR:
+    ansible_host: 192.168.1.1
+    ansible_user: net_admin
+    ansible_password: P@ssw0rd
+    ansible_connection: network_cli
+    ansible_network_os: ios
+  BR-RTR:
+    ansible_host: 192.168.3.1
+    ansible_user: net_admin
+    ansible_password: P@ssw0rd
+    ansible_connection: network_cli
+    ansible_network_os: ios
+---------------------------------------------
+
+vim /etc/ansible/ansible.cfg (пишем после defaults)
+
+-----------------------------------------------
+ansible_python_interpreter=/usr/bin/python3
+interpreter_python=auto_silent
+ansible_host_key_checking=false
+------------------------------------------------
+
+--- HQ-CLI ---
+useradd sshuser –u 2026
+passwd sshuser
+P@ssw0rd
+P@ssw0rd
+visudo (нужно убрать # в строке WHEEL_USERS ALL=(ALL:ALL) NOPASSWD: ALL)
+gpasswd –a “sshuser” wheel
+vim /etc/openssh/sshd_config
+
+---------------------------------
+Port 2026
+AllowUsers sshuser
+MaxAuthTries 2
+PasswordAuthentication yes
+Banner /etc/openssh/banner
+---------------------------------
+
+vim /etc/openssh/banner
+
+---------------------------------
+Authorized access only
+---------------------------------
+
+systemctl restart sshd
+
+--- BR-SRV ---
+Обновление машины и установка пакета ansible
+ssh-keygen -t rsa
+ssh-copy-id -p 2026 sshuser@192.168.1.10
+ssh-copy-id -p 2026 sshuser@192.168.2.10
+Примечание: если не копируется ключ, выдаёт error (зачастую с hq-cli), то перезагрузите службу
+sshd
+ansible all -m ping

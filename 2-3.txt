@@ -1,0 +1,120 @@
+
+----------------------
+центр сертификации
+----------------------
+
+---HQ-SRV---
+apt update && sudo apt install openssl -y
+openssl req –newkey rsa:4096 –nodes –keyout ca.key
+–x509 –days 365 –out ca.crt
+Enter
+HMAO
+RADUZHNY
+BY
+408
+AU-Team CA
+Enter
+ls -l
+openssl genrsa –out web.key 4096
+openssl req –key web.key –new –out web.csr
+ENTER
+HMAO
+RADUZHNY
+BY
+408
+au-team.irpo
+ENTER
+P@ssw0rd
+ENTER
+vim openssl.cnf
+
+---------------------------------------------------------------------
+[req]
+req_extensions = req_ext
+
+[req_ext]
+subjectAltName = DNS:web.au-team.irpo, DNS:docker.au-team.irpo
+extendedKeyUsage = serverAuth
+keyUsage = digitalSignature
+----------------------------------------------------------------------
+
+openssl x509 –req –in web.csr –CA ca.crt –CAkey ca.key –CAcreateserial \
+-out web.crt –days 365 –sha256 –extfile openssl.cnf –extensions req_ext
+ls –l
+
+---ISP---
+useradd sshuser
+passwd sshuser
+vim /etc/openssh/sshd_config
+
+-------------------------------------------------
+Port 22 (пишем сверху строки addressfamily any)
+-------------------------------------------------
+
+systemctl enable --now sshd
+systemctl restart sshd
+
+---HQ-SRV---
+scp web.crt web.key sshuser@172.16.1.1:/home/sshuser/
+yes
+P@ssw0rd
+
+---ISP---
+mkdir /etc/nginx/ssl
+mv /home/sshuser/web.crt /etc/nginx/ssl/
+mv /home/sshuser/web.key /etc/nginx/ssl/
+chmod 777 /etc/nginx/ssl/web.key
+vim /etc/nginx/sites-available.d/proxy.conf
+
+-----------------------------------------------------------------------------
+server {
+    	listen 80;
+    	server_name web.au-team.irpo docker.au-team.irpo;
+    	return 301 https://$host;
+}
+server {
+    	listen 443 ssl;
+    	server_name web.au-team.irpo;
+    	add_header Content-Security-Policy "upgrade-insecure-requests" always;
+    	ssl_certificate /etc/nginx/ssl/web.crt;
+    	ssl_certificate_key /etc/nginx/ssl/web.key;
+    	ssl_protocols TLSv1.2 TLSv1.3;
+    	auth_basic "Restricted Access";
+    	auth_basic_user_file /etc/nginx/.htpasswd;
+    	location / {
+        	proxy_pass http://172.16.2.5:8080;
+        	proxy_set_header Host $host;
+        	proxy_set_header X-Real-IP $remote_addr;
+    	}
+}
+server {
+    	listen 443 ssl;
+    	server_name docker.au-team.irpo;
+    	ssl_certificate /etc/nginx/ssl/web.crt;
+    	ssl_certificate_key /etc/nginx/ssl/web.key;
+    	ssl_protocols TLSv1.2 TLSv1.3;
+    	location / {
+        	proxy_pass http://172.16.1.4:8080;
+        	proxy_set_header Host $host;
+        	proxy_set_header X-Real-IP $remote_addr;
+    	}
+}
+----------------------------------------------------------------------------------
+
+systemctl restart nginx
+
+---HQ-CLI---
+su –
+systemctl restart network
+
+---HQ-SRV---
+scp –P 2026 ca.crt sshuser@192.168.2.10:/tmp
+
+---HQ-CLI---
+mkdir -p /etc/pki/ca-trust/source/anchors/
+cp /tmp/ca.crt /etc/pki/ca-trust/source/anchors/au-team-ca.crt
+update-ca-trust
+trust list | grep –i “au-team”
+Проверка:
+https://docker.au-team.irpo
+https://web.au-team.irpo

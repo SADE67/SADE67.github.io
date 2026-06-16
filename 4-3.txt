@@ -1,0 +1,42 @@
+
+-----------------------------
+Grafana и Prometheus
+-----------------------------
+
+---HQ-SRV---
+apt-get install -y grafana prometheus prometheus-node_exporter
+
+---BR-SRV---
+apt-get install -y prometheus-node_exporter
+systemctl enable --now prometheus-node_exporter
+Выполнить настройку сборщика prometheus в конфигурационном файле /etc/prometheus/prometheus.yml. В секции - job_name: 'prometheus' в static_configs дописать в поле targets IP-адреса HQ-SRV и BR-SRV вместе с портом 9100:
+
+---------------------------------------------------------------------------
+- job_name: 'prometheus'
+...
+...
+...
+static_configs:
+  - targets: ['localhost:9090','192.168.1.10:9100','192.168.3.10:9100']
+----------------------------------------------------------------------------
+
+systemctl enable --now grafana-server
+systemctl enable --now prometheus
+systemctl enable --now prometheus-node_exporter
+
+---HQ-CLI---
+перейти на сайт http://hq-srv.au-team.irpo:3000
+выполнить вход в Grafana с помощью учётной записи по умолчанию — admin с паролем admin. Заменить пароль по умолчанию на P@ssw0rd
+Добавить источник данных (Connections) типа Prometheus, указать адрес сервера ИМЕННО localhost:9090
+Импортировать дашборд, например 11074, во вкладке Dashboards. Перейти в дашборд, убедиться, что нужные данные (ЦП, ОП, хранилища) отображаются корректно:
+Как импортировать?
+Dashboards → справа New → выбираем из выпадающего Import
+Затем в строку Grafana.com dashboard URL or ID вставляем ID - 11074 и нажимаем Load
+Перекидывает на новое окно, внизу в последней строке (VictoriaMetrics) выбираем Prometheus как Data-source и нажимаем Import
+Кидает на дашборд, сверху выбираем где JOB вместо node → prometheus
+
+---BR-SRV---
+samba-tool dns add 127.0.0.1 au-team.irpo mon A 192.168.1.10 -U Administrator
+
+---HQ-CLI---
+http://mon.au-team.irpo:3000/
